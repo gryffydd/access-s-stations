@@ -21,16 +21,139 @@
     </style>
 
     <script>
-        function make_array (low, high, step) {
-            a = [];
-            for (x = low * 100; x <= high * 100 ; x += step * 100) {
-                a.push(x / 100);
+        var MARKER = {
+            onEachFeature: onEachFeature,
+            pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng, {
+                    radius: 8,
+                    fillColor: "#00FFFF",
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.25
+                });
             }
-            return a;
         }
 
-        var lat = make_array(-44.5, -10.0, 0.05);
-        var lon = make_array(112.0, 156.25, 0.05);
+        var FEATURE_COLLECTION = {
+        
+    "type": "FeatureCollection", 
+    "features": [
+        {
+            "geometry": {
+                "type": "Point", 
+                "coordinates": [
+                    115.2861, 
+                    -33.6855
+                ]
+            }, 
+            "type": "Feature", 
+            "properties": {
+                "site_name": "VASSE", 
+                "site_id": "109519"
+            }
+        }, 
+        {
+            "geometry": {
+                "type": "Point", 
+                "coordinates": [
+                    150.8611, 
+                    -33.8667
+                ]
+            }, 
+            "type": "Feature", 
+            "properties": {
+                "site_name": "ABBOTSBURY (FAIRFIELD (CITY FARM))", 
+                "site_id": "67114"
+            }
+        }, 
+        {
+            "geometry": {
+                "type": "Point", 
+                "coordinates": [
+                    151.1295, 
+                    -33.8507
+                ]
+            }, 
+            "type": "Feature", 
+            "properties": {
+                "site_name": "ABBOTSFORD (BLACKWALL POINT RD)", 
+                "site_id": "66034"
+            }
+        }, 
+        {
+            "geometry": {
+                "type": "Point", 
+                "coordinates": [
+                    147.1019, 
+                    -43.2256
+                ]
+            }, 
+            "type": "Feature", 
+            "properties": {
+                "site_name": "ABELS BAY (SANDREEF ROAD)", 
+                "site_id": "94263"
+            }
+        }, 
+        {
+            "geometry": {
+                "type": "Point", 
+                "coordinates": [
+                    151.1292, 
+                    -25.1333
+                ]
+            }, 
+            "type": "Feature", 
+            "properties": {
+                "site_name": "ABERCORN", 
+                "site_id": "39000"
+            }
+        }, 
+        {
+            "geometry": {
+                "type": "Point", 
+                "coordinates": [
+                    151.1306, 
+                    -25.1292
+                ]
+            }, 
+            "type": "Feature", 
+            "properties": {
+                "site_name": "ABERCORN TM", 
+                "site_id": "39319"
+            }
+        }
+    ]
+        };
+
+        function lon_to_x (lon) { return Math.floor((lon - 112 + 0.025) * 20); }
+        function lat_to_y (lat) { return Math.floor((lat + 44.5 + 0.025) * 20); }
+        function range_text(n) { return "[" + n + ":1:" + n + "]"; }
+        function date_string () {
+            return ((new Date(Date.now() - (3*24*60*60*1000))).toISOString().split("T")[0]).replace(/-/g, "");
+        }
+
+        function make_popup (coords) {
+            var x = lon_to_x(coords[0]);
+            var y = lat_to_y(coords[1]);
+            var content = "Lat: " + coords[1] + " - Lon: " + coords[0] + " - Index (x, y): (" + x + ", " + y + ")";
+            var fc_date = date_string();
+            var fc_var = "pr";
+            var href = "http://opendap.bom.gov.au:8080/thredds/dodsC/seasonal_prediction/access-s/atmos";
+            href += "/" + fc_var + "/e01/w_daq5_" + fc_var + "_" + fc_date + "_e01.nc.ascii?" + fc_var  + "[0:1:19][" + y + ":1:" + y + "][" + x + ":1:" + x + "]";
+            return "<a href=\"" + href + "\" target=\"opendap_" + x + "_" + y + "\">" + content + "</a>";
+        }
+
+        function onEachFeature(feature, layer) {
+            var popupContent = "Unset";
+            if (feature.properties && feature.properties.site_name) {
+                layer.bindTooltip(feature.properties.site_name); 
+            }
+            if (feature.geometry.type && feature.geometry.type == "Point" && feature.geometry.coordinates) {
+                popupContent = make_popup(feature.geometry.coordinates);
+            }
+            layer.bindPopup(popupContent);
+        }
 
         function make_point (x, y) {
             var content = "Lat: " + lat[y] + " - Lon: " + lon[x] + " - Index (x, y): (" + x + ", " + y + ")";
@@ -43,23 +166,31 @@
                 return p;
         }
 
-        function make_collection () {
-            var feature_array = [];
+        function load_collection () {
+            return FEATURE_COLLECTION;
+        }
 
-            for (x = 0; x < lon.length; x += 20) {
-                for (y = 10; y < lat.length; y += 20) {
-                    feature_array.push(make_point (x, y));
+        function load_collection_dynamic () {
+            console.log("Load Collection");
+            fetch('ACCESS-S-Stations.json')
+            .then(reponse => {
+                console.log(reponse);
+                if ( ! reponse.ok ) {
+                    throw new Error("HTTP error " + response.status);
                 }
-            }
-
-            c = {};
-            c.type = "FeatureCollection";
-            c.features = feature_array;
-
-            return c;
+                console.log("SHOW ME: " + response.body)
+                return response.json();
+            })
+            .then( json => {
+                console.log("JSON: " + json);
+                L.geoJSON(json, MARKER).addTo(map);
+            })
+            .catch( function () {
+                console.log(this);
+            })
         };
 
-        var fc = make_collection();
+
 	</script>
 
 </head>
@@ -79,27 +210,7 @@
                 id: 'mapbox.light'
             }).addTo(map);
 
-        function onEachFeature(feature, layer) {
-            var popupContent = "Unset";
-            if (feature.properties && feature.properties.content) {
-                popupContent = feature.properties.content;
-            }
-            layer.bindPopup(popupContent);
-        }
-
-        L.geoJSON(fc, {
-                onEachFeature: onEachFeature,
-                pointToLayer: function (feature, latlng) {
-                    return L.circleMarker(latlng, {
-                        radius: 8,
-                        fillColor: "#00FFFF",
-                        color: "#000",
-                        weight: 1,
-                        opacity: 1,
-                        fillOpacity: 0.25
-                });
-            }
-        }).addTo(map);
+        L.geoJSON(load_collection(), MARKER).addTo(map);
 
     </script>
 </body>
